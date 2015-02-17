@@ -285,6 +285,9 @@ angular.module("ngDraggable", [])
                     };
 
                     var updateDragStyles = function(touching, dragElement) {
+                        if(element === dragElement) {
+                           return;
+                        }
                         if(touching){
                             element.addClass('drag-enter');
                             dragElement.addClass('drag-over');
