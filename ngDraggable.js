@@ -51,6 +51,8 @@ angular.module("ngDraggable", [])
             var _dragOffset = null;
 
             var _dragEnabled = false;
+            var _dragAxis = 'both';
+            var _watchElementPositionChange = false;
 
             var _pressTimer = null;
 
@@ -69,16 +71,25 @@ angular.module("ngDraggable", [])
                scope.$watch(attrs.ngDrag, onEnableChange);
                scope.$watch(attrs.ngCenterAnchor, onCenterAnchor);
                scope.$watch(attrs.ngDragData, onDragDataChange);
+               scope.$watch(attrs.ngDragXAxis, onDragXAxisChange);
+               scope.$watch(attrs.ngDragWatchElementPositionChange, onDragWatchElementPositionChange);
                element.on(_pressEvents, onpress);
                if(! _hasTouch && element[0].nodeName.toLowerCase() == "img"){
                   element.on('mousedown', function(){ return false;}); // prevent native drag for images
                }
             };
+
             var onDestroy = function (enable) {
                toggleListeners(false);
             };
             var onDragDataChange = function (newVal, oldVal) {
                _data = newVal;
+            };
+            var onDragXAxisChange = function (newVal, oldVal) {
+               _dragAxis = newVal ? 'x' : 'both';
+            };
+            var onDragWatchElementPositionChange = function (newVal, oldVal) {
+               _watchElementPositionChange = newVal;
             };
             var onEnableChange = function (newVal, oldVal) {
                _dragEnabled = (newVal);
@@ -160,11 +171,12 @@ angular.module("ngDraggable", [])
                _mx = ngDraggable.getEventProp(evt, 'pageX');
                _my = ngDraggable.getEventProp(evt, 'pageY');
 
-               // detect when element was repositioned from another bit of code
-               if(Math.abs(ngDraggable.getPrivOffset(element).left - offset.left) > _dragOffset.width) {
-                  moveElement(0, 0);
-                  offset = ngDraggable.getPrivOffset(element);
-                  _dragOffset = offset;
+               if(_watchElementPositionChange) {
+                  if(Math.abs(ngDraggable.getPrivOffset(element).left - offset.left) > _dragOffset.width) {
+                     moveElement(0, 0);
+                     offset = ngDraggable.getPrivOffset(element);
+                     _dragOffset = offset;
+                  }
                }
 
                if (_centerAnchor) {
@@ -175,7 +187,17 @@ angular.module("ngDraggable", [])
                   _ty = _my - _mry - _dragOffset.top;
                }
 
-               moveElement(_tx, _ty);
+               switch(_dragAxis) {
+                  case 'x':
+                     moveElement(_tx, 0);
+                     break;
+                  case 'y':
+                     moveElement(0, _ty);
+                     break;
+                  default:
+                     moveElement(_tx, _ty);
+                     break;
+               }
 
                $rootScope.$broadcast('draggable:move', { x: _mx, y: _my, tx: _tx, ty: _ty, event: evt, element: element, data: _data, uid: _myid });
             };
@@ -224,6 +246,7 @@ angular.module("ngDraggable", [])
             var _data = null;
 
             var _dropEnabled=false;
+            var _listenForSelfDrop=false;
 
             var onDropCallback = $parse(attrs.ngDropSuccess);// || function(){};
 
@@ -239,7 +262,12 @@ angular.module("ngDraggable", [])
                _data = newVal;
             };
 
+            var onDropOnSelfChange = function (newVal, oldVal) {
+               _listenForSelfDrop = newVal;
+            };
+
             scope.$watch(attrs.ngDropData, onDropDataChange);
+            scope.$watch(attrs.ngDropOnSelf, onDropOnSelfChange);
 
             var initialize = function () {
                toggleListeners(true);
@@ -295,7 +323,7 @@ angular.module("ngDraggable", [])
             var onDragEnd = function (evt, obj) {
 
                // don't listen to drop events if this is the element being dragged
-               if (!_dropEnabled || _myid === obj.uid)return;
+               if (!_dropEnabled || (!_listenForSelfDrop && _myid === obj.uid))return;
                if (isTouching(obj.x, obj.y, obj.element)) {
                   // call the ngDraggable ngDragSuccess element callback
                   if(obj.callback){
